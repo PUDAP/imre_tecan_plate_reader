@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./.env:/app/edge/.env:ro
+      - /dev/bus/usb:/dev/bus/usb
     healthcheck:
       test: ["CMD", "uv", "run", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s

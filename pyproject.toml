@@ -1,7 +1,7 @@
 [project]
-name = "edge-python-template"
+name = "imre-tecan-infinite-200-pro-edge"
 version = "0.1.0"
-description = "PUDA machine edge service template"
+description = "PUDA edge driver for the Tecan Infinite 200 PRO plate reader"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -10,4 +10,5 @@ dependencies = [
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",
     "psutil>=6.1.1",
+    "pylabrobot[usb]>=0.2.1,<0.3",
 ]

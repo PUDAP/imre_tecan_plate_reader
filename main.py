@@ -13,7 +13,7 @@ import psutil
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from puda import EdgeNatsClient, EdgeRunner
-from driver import Driver
+from driver import Tecan_Infinite_200_pro
 
 
 # Configure logging
@@ -22,7 +22,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     force=True,
 )
-logging.getLogger("driver").setLevel(logging.WARNING)
+logging.getLogger("driver").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +30,11 @@ logger = logging.getLogger(__name__)
 class Config(BaseSettings):
     machine_id: str
     nats_servers: str
-    # TODO: Add driver-specific config fields here (e.g. device port, IP, etc.)
+    plate_model: str
+    counts_per_mm_x: float
+    counts_per_mm_y: float
+    counts_per_mm_z: float
+    command_timeout: float
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent / ".env",
@@ -59,7 +63,13 @@ async def main():
     logger.info("Full config: %s", config.model_dump())
 
     logger.info("Initializing machine driver")
-    driver = Driver()
+    driver = Tecan_Infinite_200_pro(
+        plate_model=config.plate_model,
+        counts_per_mm_x=config.counts_per_mm_x,
+        counts_per_mm_y=config.counts_per_mm_y,
+        counts_per_mm_z=config.counts_per_mm_z,
+        command_timeout=config.command_timeout,
+    )
     logger.info("Machine driver initialized successfully")
 
     logger.info("Connecting to NATS at %s", config.nats_servers)
@@ -88,15 +98,18 @@ async def main():
         nats_client=edge_nats_client,
         machine_driver=driver,
         telemetry_handler=telemetry_handler,
-        state_handler=lambda: {},
+        state_handler=driver.get_state,
     )
-    await runner.connect()
-    logger.info("NATS client initialized successfully")
-    logger.info(
-        "==================== %s Edge Service Ready. Publishing telemetry... ====================",
-        config.machine_id,
-    )
-    await runner.run()
+    try:
+        await runner.connect()
+        logger.info("NATS client initialized successfully")
+        logger.info(
+            "==================== %s Edge Service Ready. Publishing telemetry... ====================",
+            config.machine_id,
+        )
+        await runner.run()
+    finally:
+        driver.shutdown()
 
 
 # Run main in a loop; retry on fatal errors, exit gracefully on KeyboardInterrupt.
