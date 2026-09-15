@@ -11,8 +11,12 @@ tray control. The backend does not cover Infinite F-series readers.
 - Stop Tecan/i-control or any other process that owns the reader.
 - Linux/Docker: ensure the service account can access the USB device. Compose
   passes `/dev/bus/usb` into the container; a host udev rule may still be needed.
-- Windows bare metal: install a PyUSB-compatible driver as described in the
+- Windows bare metal: replace the Tecan driver for USB device `0C47:8007`
+  with a libwdi/WinUSB (or libusbK) driver using
+  [Zadig](https://zadig.akeo.ie/), as described in the
   [PyLabRobot USB guide](https://docs.pylabrobot.org/stable/user_guide/_getting-started/installation.html#using-the-usb-interface).
+  On the commissioned PC, the working binding is the libwdi-generated
+  `oem136.inf`; the original Tecan package is `oem98.inf`.
 
 The backend identifies USB vendor `0x0C47`, product `0x8007`.
 
@@ -30,11 +34,30 @@ uv run python main.py
 | --- | --- | --- |
 | `MACHINE_ID` | `imre-tecan-infinite-200-pro` | PUDA machine identifier |
 | `NATS_SERVERS` | template cluster | Comma-separated broker URLs |
-| `PLATE_MODEL` | `Cor_96_wellplate_360ul_Fb` | PyLabRobot plate factory name |
+| `PLATE_MODEL` | `cor_96_wellplate_360uL_Fb` | PyLabRobot plate factory name |
 | `COUNTS_PER_MM_X/Y/Z` | `1000` | Stage calibration values |
 | `COMMAND_TIMEOUT` | `600` | Maximum seconds a command may wait |
 
 The plate model supplies well geometry and must match the physical plate.
+
+### Verify the Windows USB connection
+
+The reader should appear under **Universal Serial Bus devices**, not **Tecan
+controlled devices**, after the driver is replaced. Verify PyUSB discovery:
+
+```powershell
+uv run python -c "import usb.core, libusb_package; d=usb.core.find(backend=libusb_package.get_libusb1_backend(), idVendor=0x0C47, idProduct=0x8007); print('PyUSB device found:', d is not None)"
+```
+
+Expected output is `PyUSB device found: True`.
+
+To perform a connection-only check without starting NATS:
+
+```powershell
+uv run python -c "from driver import Tecan_Infinite_200_pro; d=Tecan_Infinite_200_pro('cor_96_wellplate_360uL_Fb',1000,1000,1000,90); print(d.get_state()); d.shutdown()"
+```
+
+A successful check reports `connected: True` and `state: idle`.
 
 Docker on Linux:
 
@@ -69,3 +92,8 @@ controller initialized; check logs for the initialization message.
 
 The PyLabRobot backend is marked experimental. Validate readings against known
 controls before relying on experimental results.
+
+On the commissioned reader, `open_tray` completed successfully. A subsequent
+`close_tray` physically issued the command but timed out while waiting for the
+reader's terminal USB acknowledgement. If this occurs, inspect the tray before
+retrying so that repeated motion is not commanded blindly.

@@ -270,7 +270,10 @@ class Tecan_Infinite_200_pro:
             with self._state_lock:
                 self._tray_open = False
             self._set_state("idle")
-            logger.info("Tecan Infinite 200 PRO initialized with %s", self._plate_model)
+            logger.info(
+                "Tecan Infinite 200 PRO initialized over PyUSB (VID=0C47 PID=8007) with %s",
+                self._plate_model,
+            )
         except Exception as exc:
             self._set_error(exc)
             raise
