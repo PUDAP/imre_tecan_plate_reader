@@ -12,11 +12,20 @@ import usb.util
 from pylabrobot.plate_reading import PlateReader
 from pylabrobot.plate_reading.tecan import ExperimentalTecanInfinite200ProBackend
 
+from driver import setup_tecan_reader
 
 
 VID = 0x0C47
 PID = 0x8007
 
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logging.getLogger("pylabrobot").setLevel(logging.DEBUG)
 
 async def diagnose() -> int:
     print("[1/4] Loading the packaged libusb backend...", flush=True)
@@ -38,20 +47,21 @@ async def diagnose() -> int:
     usb.util.dispose_resources(device)
 
     print("[3/4] Starting the PyLabRobot reader handshake...", flush=True)
+    backend = ExperimentalTecanInfinite200ProBackend(
+        counts_per_mm_x=1000,
+        counts_per_mm_y=1000,
+        counts_per_mm_z=1000,
+    )
     reader = PlateReader(
         name="diagnostic_reader",
         size_x=0,
         size_y=0,
         size_z=0,
-        backend=ExperimentalTecanInfinite200ProBackend(
-            counts_per_mm_x=1000,
-            counts_per_mm_y=1000,
-            counts_per_mm_z=1000,
-        ),
+        backend=backend,
     )
     setup_complete = False
     try:
-        await asyncio.wait_for(reader.setup(), timeout=120)
+        await asyncio.wait_for(setup_tecan_reader(reader, backend), timeout=120)
         setup_complete = True
         print("[4/4] PASS: PyLabRobot initialization completed.", flush=True)
         return 0

@@ -16,6 +16,36 @@ from pylabrobot.resources import Plate
 logger = logging.getLogger(__name__)
 
 
+async def setup_tecan_reader(
+    reader: PlateReader,
+    backend: ExperimentalTecanInfinite200ProBackend,
+) -> None:
+    """Set up a reader without recursive USB recovery during startup.
+
+    The backend's optional ``QQ`` probe may time out. Its normal read-timeout
+    handler tries to recover by reconnecting and initializing again, which can
+    recurse and repeatedly close the USB connection. Recovery is unnecessary
+    until initial setup has completed, so defer it for this one operation.
+    """
+
+    recover_transport = backend._recover_transport
+
+    async def defer_transport_recovery() -> None:
+        logger.info("Deferring USB transport recovery during reader initialization")
+
+    backend._recover_transport = defer_transport_recovery
+    try:
+        await reader.setup()
+    except BaseException:
+        # reader.stop() is unavailable until Machine.setup() completes. Release
+        # a USB handle acquired by a partially completed backend setup directly.
+        if backend.io.dev is not None:
+            await backend.io.stop()
+        raise
+    finally:
+        backend._recover_transport = recover_transport
+
+
 class Tecan_Infinite_200_pro:
     """Control a Tecan Infinite 200 PRO M-series reader over USB.
 
@@ -264,7 +294,7 @@ class Tecan_Infinite_200_pro:
                 backend=backend,
             )
             reader.assign_child_resource(plate)
-            await reader.setup()
+            await setup_tecan_reader(reader, backend)
             self._reader = reader
             self._plate = plate
             with self._state_lock:

@@ -107,3 +107,8 @@ On the commissioned reader, `open_tray` completed successfully. A subsequent
 `close_tray` physically issued the command but timed out while waiting for the
 reader's terminal USB acknowledgement. If this occurs, inspect the tray before
 retrying so that repeated motion is not commanded blindly.
+
+During setup, the driver temporarily defers PyLabRobot's USB recovery handler.
+This allows an unanswered optional startup `QQ` command to time out without
+recursively closing, reopening, and reinitializing the reader. Normal USB
+recovery is restored as soon as setup finishes.
