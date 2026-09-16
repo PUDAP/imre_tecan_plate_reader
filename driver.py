@@ -31,16 +31,27 @@ async def setup_tecan_reader(
     recover_transport = backend._recover_transport
 
     async def defer_transport_recovery() -> None:
-        logger.info("Deferring USB transport recovery during reader initialization")
+        logger.warning(
+            "USB read timed out during initialization; deferring transport "
+            "recovery to avoid a recursive reconnect"
+        )
 
+    logger.info("Starting guarded Tecan USB initialization")
     backend._recover_transport = defer_transport_recovery
     try:
         await reader.setup()
+        logger.info("Guarded Tecan USB initialization completed")
     except BaseException:
+        logger.exception(
+            "Tecan initialization failed; releasing partial USB connection"
+        )
         # reader.stop() is unavailable until Machine.setup() completes. Release
         # a USB handle acquired by a partially completed backend setup directly.
         if backend.io.dev is not None:
-            await backend.io.stop()
+            try:
+                await backend.io.stop()
+            except Exception:
+                logger.exception("Failed to release partial Tecan USB connection")
         raise
     finally:
         backend._recover_transport = recover_transport
@@ -83,6 +94,7 @@ class Tecan_Infinite_200_pro:
         self._last_error: str | None = None
         self._tray_open = False
         self._reader: PlateReader | None = None
+        self._backend: ExperimentalTecanInfinite200ProBackend | None = None
         self._plate: Plate | None = None
 
         self._loop = asyncio.new_event_loop()
@@ -286,6 +298,7 @@ class Tecan_Infinite_200_pro:
                 counts_per_mm_y=self._counts_per_mm[1],
                 counts_per_mm_z=self._counts_per_mm[2],
             )
+            self._backend = backend
             reader = PlateReader(
                 name="tecan_infinite_200_pro",
                 size_x=0,
@@ -320,10 +333,11 @@ class Tecan_Infinite_200_pro:
 
     async def _reset(self) -> None:
         reader = self._require_reader()
+        backend = self._require_backend()
         self._set_state("resetting")
         try:
             await reader.stop()
-            await reader.setup()
+            await setup_tecan_reader(reader, backend)
             with self._state_lock:
                 self._tray_open = False
             self._set_state("idle")
@@ -405,6 +419,11 @@ class Tecan_Infinite_200_pro:
         if self._reader is None:
             raise RuntimeError("Tecan reader is not initialized")
         return self._reader
+
+    def _require_backend(self) -> ExperimentalTecanInfinite200ProBackend:
+        if self._backend is None:
+            raise RuntimeError("Tecan backend is not initialized")
+        return self._backend
 
     def _require_plate(self) -> Plate:
         if self._plate is None:

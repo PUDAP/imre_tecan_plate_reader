@@ -108,7 +108,11 @@ On the commissioned reader, `open_tray` completed successfully. A subsequent
 reader's terminal USB acknowledgement. If this occurs, inspect the tray before
 retrying so that repeated motion is not commanded blindly.
 
-During setup, the driver temporarily defers PyLabRobot's USB recovery handler.
-This allows an unanswered optional startup `QQ` command to time out without
-recursively closing, reopening, and reinitializing the reader. Normal USB
-recovery is restored as soon as setup finishes.
+During initial setup and reset, the driver temporarily defers PyLabRobot's USB
+recovery handler. This allows an unanswered optional startup `QQ` command to
+time out without recursively closing, reopening, and reinitializing the reader.
+Normal USB recovery is restored as soon as each setup attempt finishes. Startup
+logs include explicit guarded-initialization start, completion, timeout, and
+failure messages. A lone `Closing connection to USB device.` after diagnostic
+success or service shutdown is normal resource cleanup, not an initialization
+error.
