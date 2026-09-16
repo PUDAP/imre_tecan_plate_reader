@@ -3,7 +3,7 @@ name = "imre-tecan-infinite-200-pro-edge"
 version = "0.1.0"
 description = "PUDA edge driver for the Tecan Infinite 200 PRO plate reader"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "puda>=0.0.16",
     "pydantic>=2.12.5",

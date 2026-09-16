@@ -51,6 +51,16 @@ uv run python -c "import usb.core, libusb_package; d=usb.core.find(backend=libus
 
 Expected output is `PyUSB device found: True`.
 
+For a complete connection-only diagnostic with explicit progress and traceback,
+run:
+
+```powershell
+uv run python -u diagnose_connection.py
+```
+
+This does not move the tray or perform a measurement. It verifies USB discovery
+and the PyLabRobot initialization handshake, then releases the connection.
+
 To perform a connection-only check without starting NATS:
 
 ```powershell
